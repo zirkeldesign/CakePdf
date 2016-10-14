@@ -1,4 +1,4 @@
 Vendor/mpdf/tmp/
 Vendor/autoload.php
 Vendor/composer/
-Vendor/mpdf/ttfontdata/*
+Vendor/mpdf/ttfontdata*

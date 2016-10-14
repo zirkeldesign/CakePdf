@@ -14,7 +14,7 @@ class MpdfEngine extends AbstractPdfEngine
     public function __construct(CakePdf $Pdf)
     {
         parent::__construct($Pdf);
-        App::import('Vendor', 'CakePdf.Mpdf', array('file' => 'mpdf' . DS . 'mpdf.php'));
+        App::import('Vendor', 'CakePdf.Mpdf', ['file' => 'mpdf' . DS . 'mpdf.php']);
     }
 
 /**
@@ -24,13 +24,14 @@ class MpdfEngine extends AbstractPdfEngine
  */
     public function output()
     {
-        //mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
-        //Configure::write('debug', 0);
+        // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
+        // Configure::write('debug', 0);
         $content = $this->_Pdf->html();
         $internal_ip = env('SERVER_ADDR');
-        if ($internal_ip && in_array($internal_ip, array('10.251.3.68'))) {
-            $url = str_replace(Router::url('/', true), 'https://www.ibb.com/', $content);
-            $url = str_replace('10.251.3.68', 'www.ibb.com', $content);
+        if ($internal_ip && in_array($internal_ip, ['10.251.3.68'])) {
+            // $content = str_replace(Router::url('/', true), 'https://www.ibb.com/', $content);
+            // $content = str_replace('10.251.3.68', 'www.ibb.com', $content);
+            $content = str_replace($internal_ip . '/css', $internal_ip . '/theme/Ibb/css', $content);
         }
         if (Configure::read('debug') > 0) {
             echo $content;
