@@ -49,7 +49,7 @@ class MpdfEngine extends AbstractPdfEngine
         }
 
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
-        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
+        $content = mb_convert_encoding($content.'', 'UTF-8', 'UTF-8');
 
         error_reporting(0);
         $MPDF = new mPDF();
