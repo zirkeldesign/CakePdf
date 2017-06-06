@@ -31,13 +31,11 @@ class MpdfEngine extends AbstractPdfEngine
     public function output()
     {
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
-        //Configure::write('debug', 0);
+        // Configure::write('debug', 0);
         $content = $this->_Pdf->html();
 
-        $host = FULL_BASE_URL;
-        $host = str_replace('http://','', $host);
-        $host = str_replace('https://','', $host);
-			
+        $host = preg_replace('@^https?:\/\/@iU', '', FULL_BASE_URL);
+            
         // Rewrite internal ip asset urls
         $internal_ip = env('SERVER_ADDR');
         if ($internal_ip/* && in_array($internal_ip, ['10.251.3.68','37.61.205.200','37.61.205.123','37.61.206.113'])*/) {
@@ -47,12 +45,11 @@ class MpdfEngine extends AbstractPdfEngine
             $content = str_replace($host . '/css', $host . '/theme/Ibb/css', $content);
         }
 
-        $forcehttps = Configure::read('Site.forcehttps') ? true : false;
-        if($forcehttps){
-                $content = str_replace('http://'.$host, 'https://'.$host, $content);
+        if (!!Configure::read('Site.forcehttps')) {
+            $content = str_replace('http://' . $host, 'https://' . $host, $content);
         }
         
-        //fix utf-8 error
+        // fix utf-8 error
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
         
         // catch output if debug is true
