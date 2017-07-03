@@ -4,3 +4,7 @@ Vendor/composer/
 Vendor/mpdf/ttfontdata*
 
 .phploy
+
+*.dat
+*.mtx.php
+Vendor/mpdf/ttfontdata/*
