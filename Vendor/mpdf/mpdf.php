@@ -9273,7 +9273,7 @@ function _getImage(&$file, $firsttime=true, $allowvector=true, $orig_srcpath=fal
 			$this->file_get_contents_by_socket($file, $data);	// needs full url?? even on local (never needed for local)
 			if ($data) { $type = $this->_imageTypeFromString($data); }
 		}
-		if ((!$data || !$type) && !ini_get('allow_url_fopen') && function_exists("curl_init")) {
+		if ((!$data || !$type) && function_exists("curl_init")) {
 			$this->file_get_contents_by_curl($file, $data);		// needs full url?? even on local (never needed for local)
 			if ($data) { $type = $this->_imageTypeFromString($data); }
 		}
