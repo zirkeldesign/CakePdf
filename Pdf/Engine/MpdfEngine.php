@@ -4,7 +4,7 @@
  *
  * @author  Daniel Sturm
  * @author  Alexander Rauser
- * @build   2017-07-03
+ * @build   2017-07-18
  */
 
 App::uses('AbstractPdfEngine', 'CakePdf.Pdf/Engine');
@@ -33,6 +33,24 @@ class MpdfEngine extends AbstractPdfEngine
         parent::__construct($Pdf);
         App::import('Vendor', 'CakePdf.Mpdf', ['file' => 'mpdf' . DS . 'mpdf.php']);
         $this->_host = preg_replace('@^https?:\/\/@iU', '', FULL_BASE_URL);
+
+        if (!Cache::config('assets')) {
+            $_base_config = Cache::config('course_pdf');
+            if ($_base_config) {
+                unset($_base_config['settings']['config_name']);
+            }
+            $config = Hash::merge($_base_config ? $_base_config['settings'] : [
+                'duration' => 0 < Configure::read('debug') ? '+1 hour' : '+1 day',
+                'engine' => 'File',
+            ], [
+                'path' => CACHE . 'assets' . DS,
+                'prefix' => 'assets_' . (0 < Configure::read('debug') ? 'debug_' : ''),
+                'groups' => [
+                    'queries',
+                ],
+            ]);
+            Cache::config('assets', $config);
+        }
     }
 
     /**
@@ -47,13 +65,23 @@ class MpdfEngine extends AbstractPdfEngine
             return false;
         }
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_HEADER => 0,
-            CURLOPT_RETURNTRANSFER => 1,
-        ]);
-        $content = curl_exec($ch);
-        $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $cache_key = 'asset_by_curl_' . basename($url) . '_' . md5($url);
+        $asset_data = Cache::remember($cache_key, function () use ($url) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_HEADER => 0,
+                CURLOPT_RETURNTRANSFER => 1,
+            ]);
+            $content = curl_exec($ch);
+            $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            curl_close($ch);
+            return compact('content', 'mime');
+        }, 'assets');
+
+        if (!$asset_data) {
+            return false;
+        }
+        extract($asset_data);
 
         if ($base64Encode) {
             return $this->__base64Encode($content, $mime);
