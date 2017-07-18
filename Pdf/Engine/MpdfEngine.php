@@ -38,6 +38,14 @@ class MpdfEngine extends AbstractPdfEngine
             $_base_config = Cache::config('course_pdf');
             if ($_base_config) {
                 unset($_base_config['settings']['config_name']);
+                if (!isset($_base_config['settings']['groups']) ||
+                    'default' === $_base_config['settings']['groups'][0]) {
+                    Cache::config('course_pdf', array_merge($_base_config['settings'], [
+                        'groups' => [
+                            'courses',
+                        ],
+                    ]));
+                }
             }
             $config = Hash::merge($_base_config ? $_base_config['settings'] : [
                 'duration' => 0 < Configure::read('debug') ? '+1 hour' : '+1 day',
@@ -74,7 +82,11 @@ class MpdfEngine extends AbstractPdfEngine
             ]);
             $content = curl_exec($ch);
             $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
+            if (404 === $code) {
+                return null;
+            }
             return compact('content', 'mime');
         }, 'assets');
 
