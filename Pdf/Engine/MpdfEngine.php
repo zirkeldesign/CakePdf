@@ -167,7 +167,7 @@ class MpdfEngine extends AbstractPdfEngine
      */
     protected function _inlineImages($content)
     {
-        $regexp = '/<img[^>]*src=["\']([^>"\']*)["\'].*?>/si';
+        $regexp = '/<(?:img|image)[^>]*(?:src|xlink:href)=["\']([^>"\']*)["\'].*?>/si';
         if (!preg_match_all($regexp, $content, $m, PREG_SET_ORDER)) {
             return $content;
         }
