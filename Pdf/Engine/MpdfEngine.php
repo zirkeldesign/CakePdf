@@ -75,12 +75,33 @@ class MpdfEngine extends AbstractPdfEngine
 
         $cache_key = 'asset_by_curl_' . basename($url) . '_' . md5($url);
         $asset_data = Cache::remember($cache_key, function () use ($url) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_HEADER => 0,
-                CURLOPT_RETURNTRANSFER => 1,
-            ]);
-            $content = curl_exec($ch);
+            try {
+                $ch = curl_init($url);
+                if (false === $ch) {
+                    throw new Exception('Failed to initialize');
+                }
+                $options = [
+                    CURLOPT_URL => $url,
+                    CURLOPT_HEADER => 0,
+                    CURLOPT_RETURNTRANSFER => 1,
+                ];
+                if (defined('IS_DEV') && IS_DEV) {
+                    $options += [
+                        CURLOPT_SSL_VERIFYHOST => 0,
+                        CURLOPT_SSL_VERIFYPEER => 0,
+                    ];
+                }
+                curl_setopt_array($ch, $options);
+                $content = curl_exec($ch);
+                if (false === $content) {
+                    throw new Exception(curl_error($ch), curl_errno($ch));
+                }
+            } catch(Exception $e) {
+                trigger_error(sprintf(
+                    'Curl failed with error #%d: %s',
+                    $e->getCode(), $e->getMessage()),
+                    E_USER_ERROR);
+            }
             $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
