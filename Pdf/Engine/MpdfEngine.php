@@ -24,6 +24,13 @@ class MpdfEngine extends AbstractPdfEngine
     protected $_host;
 
     /**
+     * Flag wether to check SSL
+     *
+     * @var boolean
+     */
+    private $_verifySsl = true;
+
+    /**
      * Constructor
      *
      * @param $Pdf CakePdf instance
@@ -73,8 +80,13 @@ class MpdfEngine extends AbstractPdfEngine
             return false;
         }
 
-        $cache_key = 'asset_by_curl_' . basename($url) . '_' . md5($url);
-        $asset_data = Cache::remember($cache_key, function () use ($url) {
+        // $this->_verifySsl = defined('IS_DEV') && IS_DEV;
+        $this->_verifySsl = false;
+
+        $class = $this;
+
+        $cache_key = 'asset_by_curl_' . basename($url) . '_' . (false === $class->_verifySsl ? 'no-verify_' : '') . md5($url);
+        $asset_data = Cache::remember($cache_key, function () use ($url, $class) {
             try {
                 $ch = curl_init($url);
                 if (false === $ch) {
@@ -85,7 +97,7 @@ class MpdfEngine extends AbstractPdfEngine
                     CURLOPT_HEADER => 0,
                     CURLOPT_RETURNTRANSFER => 1,
                 ];
-                if (defined('IS_DEV') && IS_DEV) {
+                if (false === $class->_verifySsl) {
                     $options += [
                         CURLOPT_SSL_VERIFYHOST => 0,
                         CURLOPT_SSL_VERIFYPEER => 0,
