@@ -85,43 +85,59 @@ class MpdfEngine extends AbstractPdfEngine
 
         $class = $this;
 
+        $port = parse_url($url, PHP_URL_PORT);
+        $url = str_replace(
+            env("HTTP_HOST"),
+            env("REMOTE_ADDR") . ($port ? ':' . $port : ''),
+            $url
+        );
+
         $cache_key = 'asset_by_curl_' . basename($url) . '_' . (false === $class->_verifySsl ? 'no-verify_' : '') . md5($url);
-        $asset_data = Cache::remember($cache_key, function () use ($url, $class) {
-            try {
-                $ch = curl_init($url);
-                if (false === $ch) {
-                    throw new Exception('Failed to initialize');
-                }
-                $options = [
-                    CURLOPT_URL => $url,
-                    CURLOPT_HEADER => 0,
-                    CURLOPT_RETURNTRANSFER => 1,
-                ];
-                if (false === $class->_verifySsl) {
-                    $options += [
-                        CURLOPT_SSL_VERIFYHOST => 0,
-                        CURLOPT_SSL_VERIFYPEER => 0,
+        $cache_group = 'assets';
+        $asset_data = Cache::remember(
+            $cache_key,
+            function () use ($url, $class, $port) {
+                try {
+                    $ch = curl_init($url);
+                    if (false === $ch) {
+                        throw new Exception('Failed to initialize');
+                    }
+                    $options = [
+                        CURLOPT_URL => $url,
+                        CURLOPT_HEADER => 0,
+                        CURLOPT_RETURNTRANSFER => 1,
                     ];
+                    if (false === $class->_verifySsl) {
+                        $options += [
+                            CURLOPT_SSL_VERIFYHOST => 0,
+                            CURLOPT_SSL_VERIFYPEER => 0,
+                        ];
+                    }
+                    curl_setopt_array($ch, $options);
+                    $content = curl_exec($ch);
+                    if (false === $content) {
+                        throw new Exception(curl_error($ch), curl_errno($ch));
+                    }
+                } catch(Exception $e) {
+                    trigger_error(
+                        sprintf(
+                            'Curl failed with error #%d: %s',
+                            $e->getCode(),
+                            $e->getMessage()
+                        ),
+                        E_USER_ERROR
+                    );
                 }
-                curl_setopt_array($ch, $options);
-                $content = curl_exec($ch);
-                if (false === $content) {
-                    throw new Exception(curl_error($ch), curl_errno($ch));
+                $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if (404 === $code) {
+                    return null;
                 }
-            } catch(Exception $e) {
-                trigger_error(sprintf(
-                    'Curl failed with error #%d: %s',
-                    $e->getCode(), $e->getMessage()),
-                    E_USER_ERROR);
-            }
-            $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            if (404 === $code) {
-                return null;
-            }
-            return compact('content', 'mime');
-        }, 'assets');
+                return compact('content', 'mime');
+            },
+            $cache_group
+        );
 
         if (!$asset_data) {
             return false;
