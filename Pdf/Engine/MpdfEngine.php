@@ -1,4 +1,5 @@
 <?php
+
 /**
  * MpdfEngine.php
  *
@@ -45,8 +46,10 @@ class MpdfEngine extends AbstractPdfEngine
             $_base_config = Cache::config('course_pdf');
             if ($_base_config) {
                 unset($_base_config['settings']['config_name']);
-                if (!isset($_base_config['settings']['groups']) ||
-                    'default' === $_base_config['settings']['groups'][0]) {
+                if (
+                    !isset($_base_config['settings']['groups']) ||
+                    'default' === $_base_config['settings']['groups'][0]
+                ) {
                     Cache::config('course_pdf', array_merge($_base_config['settings'], [
                         'groups' => [
                             'courses',
@@ -69,6 +72,24 @@ class MpdfEngine extends AbstractPdfEngine
     }
 
     /**
+     * Fix an url matching server address and port.
+     *
+     * @param string $url Url to run fix against.
+     *
+     * @return string
+     */
+    private function _fixInternalUrl($url)
+    {
+        $port = parse_url($url, PHP_URL_PORT);
+
+        return str_replace(
+            env("HTTP_HOST"),
+            env("REMOTE_ADDR") . ($port ? ':' . $port : ''),
+            $url
+        );
+    }
+
+    /**
      * [__getAssetByCurl description]
      * @method __getAssetByCurl
      * @param [type] $url          [description]
@@ -83,20 +104,15 @@ class MpdfEngine extends AbstractPdfEngine
         // $this->_verifySsl = defined('IS_DEV') && IS_DEV;
         $this->_verifySsl = false;
 
-        $class = $this;
+        $url = $this->_fixInternalUrl($url);
 
-        $port = parse_url($url, PHP_URL_PORT);
-        $url = str_replace(
-            env("HTTP_HOST"),
-            env("REMOTE_ADDR") . ($port ? ':' . $port : ''),
-            $url
-        );
+        $class = $this;
 
         $cache_key = 'asset_by_curl_' . basename($url) . '_' . (false === $class->_verifySsl ? 'no-verify_' : '') . md5($url);
         $cache_group = 'assets';
         $asset_data = Cache::remember(
             $cache_key,
-            function () use ($url, $class, $port) {
+            function () use ($url, $class) {
                 try {
                     $ch = curl_init($url);
                     if (false === $ch) {
@@ -118,7 +134,7 @@ class MpdfEngine extends AbstractPdfEngine
                     if (false === $content) {
                         throw new Exception(curl_error($ch), curl_errno($ch));
                     }
-                } catch(Exception $e) {
+                } catch (Exception $e) {
                     trigger_error(
                         sprintf(
                             'Curl failed with error #%d: %s',
@@ -162,8 +178,10 @@ class MpdfEngine extends AbstractPdfEngine
     private function __base64Encode($content, $mime = null)
     {
         $encode = true;
-        if (is_null($mime) ||
-            !$mime) {
+        if (
+            is_null($mime) ||
+            !$mime
+        ) {
             $firstBytes = substr(trim($content), 0, 64);
             switch (true) {
                 case false !== strpos($firstBytes, '<svg '):
@@ -220,15 +238,54 @@ class MpdfEngine extends AbstractPdfEngine
         if (!preg_match_all($regexp, $content, $m, PREG_SET_ORDER)) {
             return $content;
         }
+        $replaces = [];
         for ($i = 0, $l = count($m); $i < $l; $i++) {
             $asset = $m[$i];
-            if (false === strpos($asset[1], $this->_host)) {
+            $uri = $asset[1];
+            if (false === strpos($uri, $this->_host)) {
                 continue;
             }
-            $assetContent = $this->__getAssetByCurl($asset[1], true);
-            if ($assetContent) {
-                $content = str_replace('src="' . $asset[1] . '"', 'src="' . $assetContent . '"', $content);
+
+            $absolute_uri = str_replace(
+                FULL_BASE_URL . '/',
+                '',
+                $uri
+            );
+
+            if (0 === strpos($absolute_uri, 'course/assets/')) {
+                $absolute_uri = str_replace(
+                    'course/assets/',
+                    '..' . DS . 'Plugin' . DS . 'Course' . DS . 'webroot' . DS . 'assets' . DS,
+                    $absolute_uri
+                );
             }
+
+            if (file_exists(WWW_ROOT . $absolute_uri)) {
+                $info = pathinfo(WWW_ROOT . $absolute_uri);
+                $file_content = file_get_contents(WWW_ROOT . $absolute_uri);
+                switch (true) {
+                case 'svg' === $info['extension'] && false !== strpos(substr($file_content, 0, 64), '<svg'):
+                    $replaces[$asset[0]] = $file_content;
+                    break;
+                // case 'jpg' === $info['extension']:
+                //     // case 'png':
+                //     $replaces['src="' . $uri . '"'] = 'src="' . $this->__base64Encode($file_content) . '"';
+                //     break;
+                // case 'png':
+                //     $replaces[$asset[0]] = '';
+                //     break;
+                }
+            } else {
+                // $assetContent = $this->__getAssetByCurl($uri, true);
+                // if ($assetContent
+                //     && false === strpos($assetContent, 'image/png')
+                // ) {
+                    //     $replaces['src="' . $uri . '"'] = 'src="' . $assetContent . '"';
+                    // }
+            }
+        }
+        if (count($replaces)) {
+            $content = str_replace(array_keys($replaces), $replaces, $content);
         }
         return $content;
     }
@@ -268,11 +325,12 @@ class MpdfEngine extends AbstractPdfEngine
         $content = $this->_Pdf->html();
 
         Configure::write('Site.forcehttps', true);
-        
+
         $content = $this->_replaceAssetUrls($content);
         $content = $this->_inlineStylesheets($content);
-        // $content = $this->_inlineImages($content);
-        
+        $content = $this->_inlineImages($content);
+        $content = str_replace($this->_host, env("REMOTE_ADDR"), $content);
+
         // catch output if debug is true
         if (Configure::read('debug') > 0) {
             echo $content;
