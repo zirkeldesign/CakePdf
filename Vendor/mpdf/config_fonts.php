@@ -54,8 +54,6 @@ $this->fonttrans = array(
 	'zn_hannom_a' => 'hannoma',
 	'ocr-b' => 'ocrb',
 	'ocr-b10bt' => 'ocrb',
-
-
 );
 
 /*
@@ -92,6 +90,12 @@ starting at 1, as they appear in the .ttc file e.g.
 */
 
 $this->fontdata = array(
+	"calibri" => array(
+		'R' => "CalibriW02-Regular.ttf",
+		'B' => "CalibriW02-Bold.ttf",
+		'I' => "CalibriW02-Italic.ttf",
+		'BI' => "CalibriW02-BoldItalic.ttf",
+	),
 	"dejavusanscondensed" => array(
 		'R' => "DejaVuSansCondensed.ttf",
 		'B' => "DejaVuSansCondensed-Bold.ttf",
@@ -298,5 +302,3 @@ $this->serif_fonts = array('dejavuserifcondensed','dejavuserif','freeserif','lib
 $this->mono_fonts = array('dejavusansmono','freemono','liberationmono','courier', 'mono','monospace','ocrb','ocr-b','lucidaconsole',
 				'couriernew','monotypecorsiva'
 );
-
-?>
