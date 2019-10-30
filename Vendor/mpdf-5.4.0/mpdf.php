@@ -9942,12 +9942,13 @@ function _jpgDataFromHeader($hdr) {
 
 function file_get_contents_by_curl($url, &$data) {
 	$timeout = 5;
-	try {
 	$ch = curl_init($url);
 	curl_setopt($ch, CURLOPT_HEADER, 0);
 	curl_setopt($ch, CURLOPT_NOBODY, 0);
-	curl_setopt ( $ch , CURLOPT_RETURNTRANSFER , 1 );
-	curl_setopt ( $ch , CURLOPT_CONNECTTIMEOUT , $timeout );
+	curl_setopt($ch , CURLOPT_RETURNTRANSFER, 1);
+	curl_setopt($ch , CURLOPT_CONNECTTIMEOUT, $timeout);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+	curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
 	$data = curl_exec($ch);
 	curl_close($ch);
 }
