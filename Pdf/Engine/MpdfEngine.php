@@ -44,10 +44,10 @@ class MpdfEngine extends AbstractPdfEngine
      *
      * @var string
      */
-    private $_version = '5.4.0';
+    // private $_version = '5.4.0';
     // private $_version = '5.7.4a';
     // private $_version = '6.1.4';
-    // private $_version = '7.1.9';
+    private $_version = '8.0.3';
 
     /**
      * Constructor
@@ -404,6 +404,7 @@ class MpdfEngine extends AbstractPdfEngine
                 $MPDF = new \Mpdf\Mpdf(
                     [
                         'debug' => true,
+                        'tempDir' => TMP . '/mpdf/',
                         'fontDir' => array_merge(
                             (array) $fontDirs,
                             [__DIR__ . '/custom/font/directory']
