@@ -143,26 +143,27 @@ class MpdfEngine extends AbstractPdfEngine
                 $defaultFontConfig = (new \Mpdf\Config\FontVariables())->getDefaults();
                 $fontData = $defaultFontConfig['fontdata'];
 
-                $this->config = [
-                    'debug' => true,
-                    'showImageErrors' => true,
-                    'autoPageBreak' => false,
-                    'curlAllowUnsafeSslRequests' => !! ($this->_verifySsl),
-                    'tempDir' => DS . ltrim(TMP . 'cache' . DS . 'mpdf', DS),
-                    'fontDir' => array_merge(
-                        (array) $fontDirs,
-                        [DS . ltrim(CakePlugin::path('CakePdf') . 'Fonts', DS)]
-                    ),
-                    'fontdata' => [
-                        'calibri' => [
-                            'R' => 'CalibriW02-Regular.ttf',
-                            'B' => 'CalibriW02-Bold.ttf',
-                            'I' => 'CalibriW02-Italic.ttf',
-                            'BI' => 'CalibriW02-BoldItalic.ttf',
-                            'useOTL' => 0xFF,
-                        ],
-                    ] + $fontData,
-                    'default_font' => 'calibri',
+                $this->config = array_merge(
+                    [
+                        'debug' => true,
+                        'showImageErrors' => true,
+                        'autoPageBreak' => false,
+                        'curlAllowUnsafeSslRequests' => !! ($this->_verifySsl),
+                        'tempDir' => DS . ltrim(TMP . 'cache' . DS . 'mpdf', DS),
+                        'fontDir' => array_merge(
+                            (array) $fontDirs,
+                            [DS . ltrim(CakePlugin::path('CakePdf') . 'Fonts', DS)]
+                        ),
+                        'fontdata' => [
+                            'calibri' => [
+                                'R' => 'CalibriW02-Regular.ttf',
+                                'B' => 'CalibriW02-Bold.ttf',
+                                'I' => 'CalibriW02-Italic.ttf',
+                                'BI' => 'CalibriW02-BoldItalic.ttf',
+                                'useOTL' => 0xFF,
+                            ],
+                        ] + $fontData,
+                        'default_font' => 'calibri',
                 ];
 
                 $this->mpdf = new \Mpdf\Mpdf($this->config);
