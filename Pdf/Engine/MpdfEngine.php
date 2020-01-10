@@ -164,7 +164,9 @@ class MpdfEngine extends AbstractPdfEngine
                             ],
                         ] + $fontData,
                         'default_font' => 'calibri',
-                ];
+                    ],
+                    (array)Configure::read('CakePdf')
+                );
 
                 $this->mpdf = new \Mpdf\Mpdf($this->config);
             } catch (\Mpdf\MpdfException $e) {
