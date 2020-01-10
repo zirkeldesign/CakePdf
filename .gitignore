@@ -1,11 +1,11 @@
-Vendor/autoload.php
-Vendor/composer/
-Vendor/mpdf*/tmp/
-Vendor/mpdf*/ttfontdata*
-Vendor/*
-!Vendor/dompdf
-!Vendor/tcpdf
-!Vendor/mpdf-*
+# Vendor/autoload.php
+# Vendor/composer/
+# Vendor/mpdf*/tmp/
+# Vendor/mpdf*/ttfontdata*
+# Vendor/*
+# !Vendor/dompdf
+# !Vendor/tcpdf
+# !Vendor/mpdf-*
 
 .phploy
 
