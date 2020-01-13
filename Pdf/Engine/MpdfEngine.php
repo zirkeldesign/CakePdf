@@ -2,9 +2,9 @@
 /**
  * MpdfEngine.php
  *
- * @author  Daniel Sturm
- * @author  Alexander Rauser
- * @build   2017-07-18
+ * @author Daniel Sturm
+ * @author Alexander Rauser
+ * @build  2017-07-18
  */
 
 App::uses('AbstractPdfEngine', 'CakePdf.Pdf/Engine');
@@ -19,6 +19,7 @@ class MpdfEngine extends AbstractPdfEngine
 {
     /**
      * [$_host description]
+     *
      * @var [type]
      */
     protected $_host;
@@ -133,9 +134,6 @@ class MpdfEngine extends AbstractPdfEngine
         if ('latest' === $this->_version
             || version_compare($this->_version, '7', '>=')
         ) {
-            // error_reporting(E_ALL);
-            // Configure::write('debug', 2);
-
             try {
                 $defaultConfig = (new \Mpdf\Config\ConfigVariables())->getDefaults();
                 $fontDirs = $defaultConfig['fontDir'];
@@ -143,27 +141,19 @@ class MpdfEngine extends AbstractPdfEngine
                 $defaultFontConfig = (new \Mpdf\Config\FontVariables())->getDefaults();
                 $fontData = $defaultFontConfig['fontdata'];
 
-                $this->config = array_merge(
+                $this->config = Hash::merge(
                     [
-                        'debug' => true,
-                        'showImageErrors' => true,
-                        'autoPageBreak' => false,
+                        'debug' => Configure::read('debug') > 0,
+                        'showImageErrors' => Configure::read('debug') > 0,
                         'curlAllowUnsafeSslRequests' => !! ($this->_verifySsl),
                         'tempDir' => DS . ltrim(TMP . 'cache' . DS . 'mpdf', DS),
                         'fontDir' => array_merge(
                             (array) $fontDirs,
                             [DS . ltrim(CakePlugin::path('CakePdf') . 'Fonts', DS)]
                         ),
-                        'fontdata' => [
-                            'calibri' => [
-                                'R' => 'CalibriW02-Regular.ttf',
-                                'B' => 'CalibriW02-Bold.ttf',
-                                'I' => 'CalibriW02-Italic.ttf',
-                                'BI' => 'CalibriW02-BoldItalic.ttf',
-                                'useOTL' => 0xFF,
-                            ],
-                        ] + $fontData,
-                        'default_font' => 'calibri',
+                        'fontdata' => $fontData,
+                        'use_kwt' => true,
+                        // 'autoPageBreak' => true,
                     ],
                     (array)Configure::read('CakePdf')
                 );
@@ -212,9 +202,10 @@ class MpdfEngine extends AbstractPdfEngine
 
     /**
      * [_getAssetByCurl description]
+     *
      * @method _getAssetByCurl
-     * @param [type] $url          [description]
-     * @param mixed  $base64Encode
+     * @param  [type] $url          [description]
+     * @param  mixed  $base64Encode
      */
     private function _getAssetByCurl($url, $base64Encode = false)
     {
@@ -290,6 +281,7 @@ class MpdfEngine extends AbstractPdfEngine
 
     /**
      * [_base64Encode description]
+     *
      * @method _base64Encode
      * @param  [type]     $uri     [description]
      * @param  mixed      $content
@@ -299,22 +291,22 @@ class MpdfEngine extends AbstractPdfEngine
     private function _base64Encode($content, $mime = null)
     {
         $encode = true;
-        if (is_null($mime) ||
-            !$mime
+        if (is_null($mime) 
+            || !$mime
         ) {
             $firstBytes = substr(trim($content), 0, 64);
             switch (true) {
-                case false !== strpos($firstBytes, '<svg '):
-                    $mime = 'image/svg+xml;utf-8';
-                    break;
-                case false !== strpos($firstBytes, 'PNG'):
-                    $mime = 'image/png';
-                    break;
-                case false !== strpos($firstBytes, 'JFIF'):
-                    $mime = 'image/jpg';
-                    break;
-                default:
-                    return false;
+            case false !== strpos($firstBytes, '<svg '):
+                $mime = 'image/svg+xml;utf-8';
+                break;
+            case false !== strpos($firstBytes, 'PNG'):
+                $mime = 'image/png';
+                break;
+            case false !== strpos($firstBytes, 'JFIF'):
+                $mime = 'image/jpg';
+                break;
+            default:
+                return false;
             }
         }
         return sprintf('data:%s;base64,%s', $mime, $encode ? base64_encode($content) : $content);
@@ -436,9 +428,11 @@ class MpdfEngine extends AbstractPdfEngine
                 }
             }
         }
+
         if (count($replaces)) {
             $content = str_replace(array_keys($replaces), $replaces, $content);
         }
+
         return $content;
     }
 
@@ -459,9 +453,11 @@ class MpdfEngine extends AbstractPdfEngine
             $content = str_replace(WWW_ROOT, FULL_BASE_URL . '/', $content);
             $content = str_replace($this->_host . '/css', $this->_host . '/theme/Ibb/css', $content);
         }
-        if (!!Configure::read('Site.forcehttps')) {
+
+        if (!! Configure::read('Site.forcehttps')) {
             $content = str_replace('http://' . $this->_host, 'https://' . $this->_host, $content);
         }
+
         return $content;
     }
 
@@ -475,6 +471,9 @@ class MpdfEngine extends AbstractPdfEngine
     {
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
         // Configure::write('debug', 0);
+
+        set_time_limit(1000);
+        ini_set('memory_limit', '2048M');
 
         $content = $this->_Pdf->html();
 
@@ -490,23 +489,23 @@ class MpdfEngine extends AbstractPdfEngine
             exit;
         }
 
-        // $content = str_replace($this->_host, env("SERVER_ADDR"), $content);
-        // $content = str_replace('https://10.8.13.2/course/assets/', '', $content);
-
         // fix utf-8 error
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
-        error_reporting(0);
-
         $this->mpdf->writeHTML($content);
 
-        return $this->mpdf->Output(
-            '',
-            version_compare($this->_version, '7', '>=') ?
-                \Mpdf\Output\Destination::DOWNLOAD :
-                'S'
-        );
+        $download = !! $this->config['download'];
+
+        if ('latest' === $this->_version
+            || version_compare($this->_version, '7', '>=')
+        ) {
+            $dest = $download ? \Mpdf\Output\Destination::DOWNLOAD : \Mpdf\Output\Destination::INLINE;
+        } else {
+            $dest = $download ? "D" : "S";
+        }
+
+        return $this->mpdf->Output('', $dest);
     }
 }
 
