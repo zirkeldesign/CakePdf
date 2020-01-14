@@ -462,6 +462,54 @@ class MpdfEngine extends AbstractPdfEngine
     }
 
     /**
+     * Import pages from external file
+     *
+     * @param [type] $file
+     * @param array $pages
+     * @param boolean $reset
+     * @return void
+     */
+    private function _importPage($file, $pages = [], $reset = false)
+    {
+        list($plugin, $path) = pluginSplit($file);
+
+        if ($plugin
+            && CakePlugin::loaded($plugin)
+        ) {
+            $file = DS . ltrim(CakePlugin::path($plugin), DS) . 'webroot' . $path;
+        }
+
+        $filePages = $this->mpdf->setSourceFile($file);
+        if ($filePages) {
+            $pages = (array)$pages;
+            $pageNumbers = Hash::numeric(array_values($pages)) ? array_values($pages) : array_keys($pages);
+
+            for ($i = 1; $i <= $filePages; $i++) {
+                if (in_array($i, (array)$pageNumbers)) {
+                    if ($reset) {
+                        $this->mpdf->AddPageByArray([
+                            'condition' => 'NEXT-ODD',
+                            'ohvalue' => -1,
+                            'ehvalue' => -1,
+                            'ofvalue' => -1,
+                            'efvalue' => -1,
+                        ]);
+                    } else {
+                        $this->mpdf->AddPage();
+                    }
+                    $tplId = $this->mpdf->importPage($i);
+                    $this->mpdf->useTemplate($tplId);
+                    if (isset($pages[$i])) {
+                        $this->mpdf->WriteHTML($pages[$i]);
+                    } else {
+                        $this->mpdf->WriteHTML('');
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Generates Pdf from html
      *
      * @method output
@@ -493,7 +541,51 @@ class MpdfEngine extends AbstractPdfEngine
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
+        if ($this->config['prepend']) {
+            foreach ($this->config['prepend'] as $file => $pages) {
+                $this->_importPage($file, $pages);
+                $margin = Hash::merge(
+                    [
+                        'left' => 0,
+                        'right' => 0,
+                        'top' => 0,
+                        'bottom' => 0,
+                        'header' => 0,
+                        'footer' => 0,
+                    ],
+                    (array)$this->config['margin'],
+                    $this->_Pdf->margin()
+                );
+                $this->mpdf->AddPageByArray(
+                    [
+                        'orientation' => '',
+                        'condition' => 'NEXT-ODD',
+                        'ohname' => 'html_header',
+                        'ehname' => 'html_header',
+                        'ofname' => 'html_footer',
+                        'efname' => 'html_footer',
+                        'ohvalue' => 1,
+                        'ehvalue' => 1,
+                        'ofvalue' => 1,
+                        'efvalue' => 1,
+                        'mgl' => $margin['left'],
+                        'mgr' => $margin['right'],
+                        'mgt' => $margin['top'],
+                        'mgb' => $margin['bottom'],
+                        'mgh' => $margin['header'],
+                        'mgf' => $margin['footer'],
+                    ]
+                );
+            }
+        }
+
         $this->mpdf->writeHTML($content);
+
+        if ($this->config['append']) {
+            foreach ($this->config['append'] as $file => $pages) {
+                $this->_importPage($file, $pages, true);
+            }
+        }
 
         $download = !! $this->config['download'];
 
