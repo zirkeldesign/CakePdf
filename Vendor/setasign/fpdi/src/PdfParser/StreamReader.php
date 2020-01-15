@@ -401,6 +401,12 @@ class StreamReader
      */
     public function reset($pos = 0, $length = 200)
     {
+        if (!(is_resource($this->stream) && 'stream' === get_resource_type($this->stream))) {
+            throw new \InvalidArgumentException(
+                'No stream given.'
+            );
+        }
+
         if ($pos === null) {
             $pos = $this->position + $this->offset;
         } elseif ($pos < 0) {
@@ -453,7 +459,7 @@ class StreamReader
     {
         $length = \max($minLength, 100);
 
-        if (\feof($this->stream) || $this->getTotalLength() === $this->position + $this->bufferLength) {
+        if (!(is_resource($this->stream) && 'stream' === get_resource_type($this->stream)) || \feof($this->stream) || $this->getTotalLength() === $this->position + $this->bufferLength) {
             return false;
         }
 
@@ -461,7 +467,7 @@ class StreamReader
         do {
             $this->buffer .= \fread($this->stream, $newLength - $this->bufferLength);
             $this->bufferLength = \strlen($this->buffer);
-        } while (($this->bufferLength !== $newLength) && !\feof($this->stream));
+        } while (is_resource($this->stream) && 'stream' === get_resource_type($this->stream) && ($this->bufferLength !== $newLength) && !\feof($this->stream));
 
         return true;
     }
