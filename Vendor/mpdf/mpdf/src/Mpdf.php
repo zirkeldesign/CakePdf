@@ -14844,6 +14844,14 @@ class Mpdf implements \Psr\Log\LoggerAwareInterface
 			$p = array_merge($p, $zp);
 		}
 
+		// If nth page
+		if (isset($this->cssManager->CSS['@PAGE>>PSEUDO>>NTH-CHILD(' . $this->page . ')'])) {
+			$zp = $this->cssManager->CSS['@PAGE>>PSEUDO>>NTH-CHILD(' . $this->page . ')'];
+			if (is_array($zp) && !empty($zp)) {
+				$p = array_merge($p, $zp);
+			}
+		}
+
 		// If named page
 		if ($name) {
 			if (isset($this->cssManager->CSS['@PAGE>>NAMED>>' . $name])) {
