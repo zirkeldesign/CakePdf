@@ -543,7 +543,7 @@ class MpdfEngine extends AbstractPdfEngine
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
-        @ini_set('pcre.backtrack_limit', min(1000000, round(strlen($content) * 2)));
+        @ini_set('pcre.backtrack_limit', max(1000000, round(strlen($content) * 2)));
 
         if (isset($this->config['prepend'])) {
             foreach ($this->config['prepend'] as $file => $pages) {
