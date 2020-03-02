@@ -296,17 +296,17 @@ class MpdfEngine extends AbstractPdfEngine
         ) {
             $firstBytes = substr(trim($content), 0, 64);
             switch (true) {
-                case false !== strpos($firstBytes, '<svg '):
-                    $mime = 'image/svg+xml;utf-8';
-                    break;
-                case false !== strpos($firstBytes, 'PNG'):
-                    $mime = 'image/png';
-                    break;
-                case false !== strpos($firstBytes, 'JFIF'):
-                    $mime = 'image/jpg';
-                    break;
-                default:
-                    return false;
+            case false !== strpos($firstBytes, '<svg '):
+                $mime = 'image/svg+xml;utf-8';
+                break;
+            case false !== strpos($firstBytes, 'PNG'):
+                $mime = 'image/png';
+                break;
+            case false !== strpos($firstBytes, 'JFIF'):
+                $mime = 'image/jpg';
+                break;
+            default:
+                return false;
             }
         }
         return sprintf('data:%s;base64,%s', $mime, $encode ? base64_encode($content) : $content);
@@ -405,19 +405,19 @@ class MpdfEngine extends AbstractPdfEngine
                 $info = pathinfo(WWW_ROOT . $absolute_uri);
                 $file_content = file_get_contents(WWW_ROOT . $absolute_uri);
                 switch (true) {
-                    case 'svg' === $info['extension']
+                case 'svg' === $info['extension']
                     && false !== strpos(substr($file_content, 0, 64), '<svg'):
-                        $replaces[$asset[0]] = $file_content;
-                        break;
-                    case 'jpg' === $info['extension']:
-                    case 'png' === $info['extension']:
-                        // $replaces['src="' . $uri . '"'] = 'src="' . str_replace($this->_host, env('SERVER_ADDR'), $uri) . '"';
-                        // $key = basename($uri);
-                        // $replaces['src="' . $uri . '"'] = 'src="var:' . $key . '"';
-                        // $this->_images[$key] = $file_content;
-                        // unset($file_content);
-                        $replaces[$asset[0]] = str_replace($uri, $this->_base64Encode($file_content), $asset[0]);
-                        break;
+                    $replaces[$asset[0]] = $file_content;
+                    break;
+                case 'jpg' === $info['extension']:
+                case 'png' === $info['extension']:
+                    // $replaces['src="' . $uri . '"'] = 'src="' . str_replace($this->_host, env('SERVER_ADDR'), $uri) . '"';
+                    // $key = basename($uri);
+                    // $replaces['src="' . $uri . '"'] = 'src="var:' . $key . '"';
+                    // $this->_images[$key] = $file_content;
+                    // unset($file_content);
+                    $replaces[$asset[0]] = str_replace($uri, $this->_base64Encode($file_content), $asset[0]);
+                    break;
                 }
             } else {
                 $assetContent = $this->_getAssetByCurl($uri, true);
@@ -464,9 +464,9 @@ class MpdfEngine extends AbstractPdfEngine
     /**
      * Import pages from external file
      *
-     * @param [type] $file
-     * @param array $pages
-     * @param boolean $reset
+     * @param  [type]  $file
+     * @param  array   $pages
+     * @param  boolean $reset
      * @return void
      */
     private function _importPage($file, $pages = [], $reset = false)
@@ -487,13 +487,15 @@ class MpdfEngine extends AbstractPdfEngine
             for ($i = 1; $i <= $filePages; $i++) {
                 if (in_array($i, (array)$pageNumbers)) {
                     if ($reset) {
-                        $this->mpdf->AddPageByArray([
+                        $this->mpdf->AddPageByArray(
+                            [
                             'condition' => 'NEXT-ODD',
                             'ohvalue' => -1,
                             'ehvalue' => -1,
                             'ofvalue' => -1,
                             'efvalue' => -1,
-                        ]);
+                            ]
+                        );
                     } else {
                         $this->mpdf->AddPage();
                     }
@@ -541,6 +543,8 @@ class MpdfEngine extends AbstractPdfEngine
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
+        @ini_set('pcre.backtrack_limit', min(1000000, round(strlen($content) * 2)));
+
         if (isset($this->config['prepend'])) {
             foreach ($this->config['prepend'] as $file => $pages) {
                 $this->_importPage($file, $pages);
@@ -580,8 +584,6 @@ class MpdfEngine extends AbstractPdfEngine
         }
 
         $this->mpdf->writeHTML($content);
-
-        @ini_set('pcre.backtrack_limit', min(1000000, round(strlen($content) * 1.5)));
 
         if (isset($this->config['append'])) {
             foreach ($this->config['append'] as $file => $pages) {
