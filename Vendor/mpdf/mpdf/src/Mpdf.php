@@ -39,7 +39,7 @@ class Mpdf implements \Psr\Log\LoggerAwareInterface
 	use Strict;
 	use FpdiTrait;
 
-	const VERSION = '8.0.4';
+	const VERSION = '8.0.5';
 
 	const SCALE = 72 / 25.4;
 
@@ -14665,7 +14665,7 @@ class Mpdf implements \Psr\Log\LoggerAwareInterface
 				$prop[1] = $tmp;
 			}
 		} else {
-			return [];
+			return ['w' => 0, 's' => 0];
 		}
 		// Size
 		$bsize = $this->sizeConverter->convert($prop[0], $refw, $this->FontSize, false);
@@ -14842,14 +14842,6 @@ class Mpdf implements \Psr\Log\LoggerAwareInterface
 		}
 		if (is_array($zp) && !empty($zp)) {
 			$p = array_merge($p, $zp);
-		}
-
-		// If nth page
-		if (isset($this->cssManager->CSS['@PAGE>>PSEUDO>>NTH-CHILD(' . $this->page . ')'])) {
-			$zp = $this->cssManager->CSS['@PAGE>>PSEUDO>>NTH-CHILD(' . $this->page . ')'];
-			if (is_array($zp) && !empty($zp)) {
-				$p = array_merge($p, $zp);
-			}
 		}
 
 		// If named page
