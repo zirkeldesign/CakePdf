@@ -114,8 +114,8 @@ class MpdfEngine extends AbstractPdfEngine
     {
         $root = CakePlugin::path('CakePdf');
         
-        if (file_exists($root . 'vendor/autoload.php')) {
-            include_once $root . 'vendor/autoload.php';
+        if (file_exists($root . 'Vendor/autoload.php')) {
+            include_once $root . 'Vendor/autoload.php';
         }
 
         if (!array_key_exists('__composer_autoload_files', $GLOBALS)
