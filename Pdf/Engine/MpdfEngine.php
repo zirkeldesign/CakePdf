@@ -195,7 +195,7 @@ class MpdfEngine extends AbstractPdfEngine
 
         return str_replace(
             env('HTTP_HOST'),
-            env('REMOTE_ADDR') . ($add_port && $port ? ':' . $port : ''),
+            env('SERVER_ADDR') . ($add_port && $port ? ':' . $port : ''),
             $url
         );
     }
