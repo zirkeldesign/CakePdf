@@ -1,10 +1,14 @@
-Vendor/mpdf/tmp/
-Vendor/autoload.php
-Vendor/composer/
-Vendor/mpdf/ttfontdata*
+# Vendor/autoload.php
+# Vendor/composer/
+Vendor/mpdf*/tmp/
+Vendor/mpdf*/ttfontdata*
+# Vendor/*
+# !Vendor/dompdf
+# !Vendor/tcpdf
+# !Vendor/mpdf-*
 
 .phploy
 
 *.dat
 *.mtx.php
-Vendor/mpdf/ttfontdata/*
+.DS_Store

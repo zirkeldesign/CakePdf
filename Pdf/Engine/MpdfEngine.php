@@ -1,11 +1,10 @@
 <?php
-
 /**
  * MpdfEngine.php
  *
- * @author  Daniel Sturm
- * @author  Alexander Rauser
- * @build   2017-07-18
+ * @author Daniel Sturm
+ * @author Alexander Rauser
+ * @build  2017-07-18
  */
 
 App::uses('AbstractPdfEngine', 'CakePdf.Pdf/Engine');
@@ -20,6 +19,7 @@ class MpdfEngine extends AbstractPdfEngine
 {
     /**
      * [$_host description]
+     *
      * @var [type]
      */
     protected $_host;
@@ -32,6 +32,27 @@ class MpdfEngine extends AbstractPdfEngine
     private $_verifySsl = true;
 
     /**
+     * Use library version.
+     *
+     * @var string
+     */
+    private $_version = 'latest';
+
+    /**
+     * Contain the MPDF class.
+     *
+     * @var [type]
+     */
+    public $mpdf = null;
+
+    /**
+     * Config
+     *
+     * @var array
+     */
+    public $config = [];
+
+    /**
      * Constructor
      *
      * @param $Pdf CakePdf instance
@@ -39,63 +60,154 @@ class MpdfEngine extends AbstractPdfEngine
     public function __construct(CakePdf $Pdf)
     {
         parent::__construct($Pdf);
-        App::import('Vendor', 'CakePdf.Mpdf', ['file' => 'mpdf' . DS . 'mpdf.php']);
+
+        $this->_initMPDF();
+
         $this->_host = preg_replace('@^https?:\/\/@iU', '', FULL_BASE_URL);
 
         if (!Cache::config('assets')) {
             $_base_config = Cache::config('course_pdf');
             if ($_base_config) {
                 unset($_base_config['settings']['config_name']);
-                if (
-                    !isset($_base_config['settings']['groups']) ||
-                    'default' === $_base_config['settings']['groups'][0]
+                if (!isset($_base_config['settings']['groups'])
+                    || 'default' === $_base_config['settings']['groups'][0]
                 ) {
-                    Cache::config('course_pdf', array_merge($_base_config['settings'], [
-                        'groups' => [
-                            'courses',
-                        ],
-                    ]));
+                    Cache::config(
+                        'course_pdf',
+                        array_merge(
+                            $_base_config['settings'],
+                            [
+                                'groups' => [
+                                    'courses',
+                                ],
+                            ]
+                        )
+                    );
                 }
             }
-            $config = Hash::merge($_base_config ? $_base_config['settings'] : [
-                'duration' => 0 < Configure::read('debug') ? '+1 hour' : '+1 day',
-                'engine' => 'File',
-            ], [
-                'path' => CACHE . 'assets' . DS,
-                'prefix' => 'assets_' . (0 < Configure::read('debug') ? 'debug_' : ''),
-                'groups' => [
-                    'queries',
+           
+            $config = Hash::merge(
+                $_base_config ?
+                $_base_config['settings'] :
+                [
+                    'duration' => 0 < Configure::read('debug') ? '+1 hour' : '+1 day',
+                    'engine' => 'File',
                 ],
-            ]);
+                [
+                    'path' => CACHE . 'assets' . DS,
+                    'prefix' => 'assets_' . (0 < Configure::read('debug') ? 'debug_' : ''),
+                    'groups' => [
+                        'queries',
+                    ],
+                ]
+            );
             Cache::config('assets', $config);
         }
     }
 
     /**
+     * Init MPDF class
+     *
+     * @return void
+     */
+    private function _initMPDF()
+    {
+        $root = CakePlugin::path('CakePdf');
+        
+        if (file_exists($root . 'vendor/autoload.php')) {
+            include_once $root . 'vendor/autoload.php';
+        }
+
+        if (!array_key_exists('__composer_autoload_files', $GLOBALS)
+            && $this->_version
+            && 'latest' !== $this->_version
+        ) {
+            App::import(
+                'Vendor',
+                'CakePdf.Mpdf',
+                [
+                    'file' => 'mpdf' . ($this->_version ? '-' . $this->_version : '' ) . DS . 'mpdf.php'
+                ]
+            );
+        }
+
+        if ('latest' === $this->_version
+            || version_compare($this->_version, '7', '>=')
+        ) {
+            try {
+                $defaultConfig = (new \Mpdf\Config\ConfigVariables())->getDefaults();
+                $fontDirs = $defaultConfig['fontDir'];
+
+                $defaultFontConfig = (new \Mpdf\Config\FontVariables())->getDefaults();
+                $fontData = $defaultFontConfig['fontdata'];
+
+                $this->config = Hash::merge(
+                    [
+                        'debug' => Configure::read('debug') > 0,
+                        'showImageErrors' => Configure::read('debug') > 0,
+                        'curlAllowUnsafeSslRequests' => !! ($this->_verifySsl),
+                        'tempDir' => DS . ltrim(TMP . 'cache' . DS . 'mpdf', DS),
+                        'fontDir' => array_merge(
+                            (array) $fontDirs,
+                            [DS . ltrim(CakePlugin::path('CakePdf') . 'Fonts', DS)]
+                        ),
+                        'fontdata' => $fontData,
+                        'use_kwt' => true,
+                        // 'autoPageBreak' => true,
+                    ],
+                    (array)Configure::read('CakePdf')
+                );
+
+                $this->mpdf = new \Mpdf\Mpdf($this->config);
+            } catch (\Mpdf\MpdfException $e) {
+                // Note: safer fully qualified exception name used for catch
+                // Process the exception, log, print etc.
+                echo $e->getMessage();
+                die;
+            }
+        } else {
+            $this->mpdf = new mPDF();
+    
+            // $this->mpdf->useSubstitutions = false;
+            $this->mpdf->simpleTables = true;
+            // $this->mpdf->SetAutoPageBreak(false);
+            $this->mpdf->showImageErrors = true;
+        
+            if (version_compare($this->_version, '6', '>=')) {
+                $this->mpdf->autoLangToFont = true;
+            }
+        }
+
+        return $this->mpdf;
+    }
+
+    /**
      * Fix an url matching server address and port.
      *
-     * @param string $url Url to run fix against.
+     * @param string  $url      Url to run fix against.
+     * @param boolean $add_port Wether to add the original port.
      *
      * @return string
      */
-    private function _fixInternalUrl($url)
+    private function _fixInternalUrl($url, $add_port = true)
     {
         $port = parse_url($url, PHP_URL_PORT);
 
         return str_replace(
-            env("HTTP_HOST"),
-            env("REMOTE_ADDR") . ($port ? ':' . $port : ''),
+            env('HTTP_HOST'),
+            env('REMOTE_ADDR') . ($add_port && $port ? ':' . $port : ''),
             $url
         );
     }
 
     /**
-     * [__getAssetByCurl description]
-     * @method __getAssetByCurl
-     * @param [type] $url          [description]
-     * @param mixed  $base64Encode
+     * [_getAssetByCurl description]
+     *
+     * @method _getAssetByCurl
+     * @param  [type] $url          [description]
+     * @param  mixed  $base64Encode
      */
-    private function __getAssetByCurl($url, $base64Encode = false)
+    private function _getAssetByCurl($url, $base64Encode = false)
     {
         if (!function_exists('curl_init')) {
             return false;
@@ -161,52 +273,53 @@ class MpdfEngine extends AbstractPdfEngine
         extract($asset_data);
 
         if ($base64Encode) {
-            return $this->__base64Encode($content, $mime);
+            return $this->_base64Encode($content, $mime);
         }
 
         return $content;
     }
 
     /**
-     * [__base64Encode description]
-     * @method __base64Encode
+     * [_base64Encode description]
+     *
+     * @method _base64Encode
      * @param  [type]     $uri     [description]
      * @param  mixed      $content
      * @param  null|mixed $mime
      * @return [type]     [description]
      */
-    private function __base64Encode($content, $mime = null)
+    private function _base64Encode($content, $mime = null)
     {
         $encode = true;
-        if (
-            is_null($mime) ||
-            !$mime
+        if (is_null($mime)
+            || !$mime
         ) {
             $firstBytes = substr(trim($content), 0, 64);
             switch (true) {
-                case false !== strpos($firstBytes, '<svg '):
-                    $mime = 'image/svg+xml;utf-8';
-                    break;
-                case false !== strpos($firstBytes, 'PNG'):
-                    $mime = 'image/png';
-                    break;
-                case false !== strpos($firstBytes, 'JFIF'):
-                    $mime = 'image/jpg';
-                    break;
-                default:
-                    return false;
+            case false !== strpos($firstBytes, '<svg '):
+                $mime = 'image/svg+xml;utf-8';
+                break;
+            case false !== strpos($firstBytes, 'PNG'):
+                $mime = 'image/png';
+                break;
+            case false !== strpos($firstBytes, 'JFIF'):
+                $mime = 'image/jpg';
+                break;
+            default:
+                return false;
             }
         }
         return sprintf('data:%s;base64,%s', $mime, $encode ? base64_encode($content) : $content);
     }
 
     /**
-     * [_inlineStylesheets description]
-     * @method _inlineStylesheets
-     * @param  [type] $content [description]
-     * @return [type] [description]
+     * [inlineStylesheets description]
+     *
+     * @param string $content
+     *
+     * @return string
      */
-    protected function _inlineStylesheets($content)
+    protected function inlineStylesheets($content)
     {
         $regexp = '/<link[^>]*rel=["\']stylesheet["\'][^>]*href=["\']([^>"\']*)["\'].*?>/si';
         if (!preg_match_all($regexp, $content, $m, PREG_SET_ORDER)) {
@@ -217,8 +330,9 @@ class MpdfEngine extends AbstractPdfEngine
             if (false === strpos($asset[1], $this->_host)) {
                 continue;
             }
-            $assetContent = $this->__getAssetByCurl($asset[1]);
+            $assetContent = $this->_getAssetByCurl($asset[1]);
             if ($assetContent) {
+                $assetContent = preg_replace('@\s*/\*.+\*/\s*@mU', '', $assetContent);
                 $content = str_replace($asset[0], '<style>' . $assetContent . '</style>', $content);
             }
             unset($assetContent);
@@ -227,75 +341,109 @@ class MpdfEngine extends AbstractPdfEngine
     }
 
     /**
-     * [_inlineImages description]
-     * @method _inlineImages
-     * @param  [type] $content [description]
-     * @return [type] [description]
+     *
      */
-    protected function _inlineImages($content)
+    protected function getAbsoluteUri($uri)
     {
-        $regexp = '/<(?:img|image)[^>]*(?:src|xlink:href)=["\']([^>"\']*)["\'].*?>/si';
-        if (!preg_match_all($regexp, $content, $m, PREG_SET_ORDER)) {
+        $replace_strings = [
+            env('REQUEST_SCHEME') . '://' . env('SERVER_ADDR') . '/',
+            FULL_BASE_URL . '/',
+        ];
+
+        $absolute_uri = str_replace(
+            $replace_strings,
+            '',
+            $uri
+        );
+
+        if (0 === strpos($absolute_uri, 'course/assets/')) {
+            $absolute_uri = str_replace(
+                'course/assets/',
+                '..' . DS . 'Plugin' . DS . 'Course' . DS . 'webroot' . DS . 'assets' . DS,
+                $absolute_uri
+            );
+        }
+
+        return $absolute_uri;
+    }
+
+    /**
+     * [inlineImages description]
+     *
+     * @param string $content
+     *
+     * @return string
+     */
+    protected function inlineImages($content)
+    {
+        $regexp_images = '/<(?:img|image)[^>]*(?:src|xlink:href)=["\']([^>"\']*)["\'].*?>/si';
+        preg_match_all($regexp_images, $content, $m, PREG_SET_ORDER);
+
+        $regexp_inline = '/\:url\(["\']?([^>"\']*)["\']?\)/si';
+        preg_match_all($regexp_inline, $content, $n, PREG_SET_ORDER);
+
+        if (!count($m)
+            && !count($n)
+        ) {
             return $content;
         }
+
+        $matches = array_merge((array) $m, (array) $n);
         $replaces = [];
-        for ($i = 0, $l = count($m); $i < $l; $i++) {
-            $asset = $m[$i];
+        for ($i = 0, $l = count($matches); $i < $l; $i++) {
+            $asset = $matches[$i];
             $uri = $asset[1];
-            if (false === strpos($uri, $this->_host)) {
+            if (false === strpos($uri, $this->_host)
+                && false === strpos($uri, env('SERVER_ADDR'))
+            ) {
                 continue;
             }
-
-            $absolute_uri = str_replace(
-                FULL_BASE_URL . '/',
-                '',
-                $uri
-            );
-
-            if (0 === strpos($absolute_uri, 'course/assets/')) {
-                $absolute_uri = str_replace(
-                    'course/assets/',
-                    '..' . DS . 'Plugin' . DS . 'Course' . DS . 'webroot' . DS . 'assets' . DS,
-                    $absolute_uri
-                );
-            }
+            
+            $absolute_uri = $this->getAbsoluteUri($uri);
 
             if (file_exists(WWW_ROOT . $absolute_uri)) {
                 $info = pathinfo(WWW_ROOT . $absolute_uri);
                 $file_content = file_get_contents(WWW_ROOT . $absolute_uri);
                 switch (true) {
-                case 'svg' === $info['extension'] && false !== strpos(substr($file_content, 0, 64), '<svg'):
+                case 'svg' === $info['extension']
+                    && false !== strpos(substr($file_content, 0, 64), '<svg'):
                     $replaces[$asset[0]] = $file_content;
                     break;
-                // case 'jpg' === $info['extension']:
-                //     // case 'png':
-                //     $replaces['src="' . $uri . '"'] = 'src="' . $this->__base64Encode($file_content) . '"';
-                //     break;
-                // case 'png':
-                //     $replaces[$asset[0]] = '';
-                //     break;
+                case 'jpg' === $info['extension']:
+                case 'png' === $info['extension']:
+                    // $replaces['src="' . $uri . '"'] = 'src="' . str_replace($this->_host, env('SERVER_ADDR'), $uri) . '"';
+                    // $key = basename($uri);
+                    // $replaces['src="' . $uri . '"'] = 'src="var:' . $key . '"';
+                    // $this->_images[$key] = $file_content;
+                    // unset($file_content);
+                    $replaces[$asset[0]] = str_replace($uri, $this->_base64Encode($file_content), $asset[0]);
+                    break;
                 }
             } else {
-                // $assetContent = $this->__getAssetByCurl($uri, true);
-                // if ($assetContent
-                //     && false === strpos($assetContent, 'image/png')
-                // ) {
-                    //     $replaces['src="' . $uri . '"'] = 'src="' . $assetContent . '"';
-                    // }
+                $assetContent = $this->_getAssetByCurl($uri, true);
+                if ($assetContent
+                    && false === strpos($assetContent, 'image/png')
+                ) {
+                    $replaces['src="' . $uri . '"'] = 'src="' . $assetContent . '"';
+                }
             }
         }
+
         if (count($replaces)) {
             $content = str_replace(array_keys($replaces), $replaces, $content);
         }
+
         return $content;
     }
 
     /**
-     * [_replaceAssetUrls description]
-     * @method _replaceAssetUrls
-     * @param [type] $content [description]
+     * [replaceAssetUrls description]
+     *
+     * @param string $content
+     *
+     * @return string
      */
-    protected function _replaceAssetUrls($content)
+    protected function replaceAssetUrls($content)
     {
         // Rewrite internal ip asset urls
         $internal_ip = env('SERVER_ADDR');
@@ -305,10 +453,62 @@ class MpdfEngine extends AbstractPdfEngine
             $content = str_replace(WWW_ROOT, FULL_BASE_URL . '/', $content);
             $content = str_replace($this->_host . '/css', $this->_host . '/theme/Ibb/css', $content);
         }
-        if (!!Configure::read('Site.forcehttps')) {
+
+        if (!! Configure::read('Site.forcehttps')) {
             $content = str_replace('http://' . $this->_host, 'https://' . $this->_host, $content);
         }
+
         return $content;
+    }
+
+    /**
+     * Import pages from external file
+     *
+     * @param  [type]  $file
+     * @param  array   $pages
+     * @param  boolean $reset
+     * @return void
+     */
+    private function _importPage($file, $pages = [], $reset = false)
+    {
+        list($plugin, $path) = pluginSplit($file);
+
+        if ($plugin
+            && CakePlugin::loaded($plugin)
+        ) {
+            $file = DS . ltrim(CakePlugin::path($plugin), DS) . 'webroot' . $path;
+        }
+
+        $filePages = $this->mpdf->setSourceFile($file);
+        if ($filePages) {
+            $pages = (array)$pages;
+            $pageNumbers = Hash::numeric(array_values($pages)) ? array_values($pages) : array_keys($pages);
+
+            for ($i = 1; $i <= $filePages; $i++) {
+                if (in_array($i, (array)$pageNumbers)) {
+                    if ($reset) {
+                        $this->mpdf->AddPageByArray(
+                            [
+                            'condition' => 'NEXT-ODD',
+                            'ohvalue' => -1,
+                            'ehvalue' => -1,
+                            'ofvalue' => -1,
+                            'efvalue' => -1,
+                            ]
+                        );
+                    } else {
+                        $this->mpdf->AddPage();
+                    }
+                    $tplId = $this->mpdf->importPage($i);
+                    $this->mpdf->useTemplate($tplId);
+                    if (isset($pages[$i])) {
+                        $this->mpdf->WriteHTML($pages[$i]);
+                    } else {
+                        $this->mpdf->WriteHTML('');
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -322,14 +522,16 @@ class MpdfEngine extends AbstractPdfEngine
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
         // Configure::write('debug', 0);
 
+        set_time_limit(1000);
+        ini_set('memory_limit', '2048M');
+
         $content = $this->_Pdf->html();
 
         Configure::write('Site.forcehttps', true);
 
-        $content = $this->_replaceAssetUrls($content);
-        $content = $this->_inlineStylesheets($content);
-        $content = $this->_inlineImages($content);
-        $content = str_replace($this->_host, env("REMOTE_ADDR"), $content);
+        $content = $this->replaceAssetUrls($content);
+        $content = $this->inlineStylesheets($content);
+        $content = $this->inlineImages($content);
 
         // catch output if debug is true
         if (Configure::read('debug') > 0) {
@@ -339,16 +541,67 @@ class MpdfEngine extends AbstractPdfEngine
 
         // fix utf-8 error
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
-        $content = mb_convert_encoding(' ' . $content, 'UTF-8', 'UTF-8');
+        $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
-        error_reporting(0);
-        $MPDF = new mPDF();
-        $MPDF->useSubstitutions = false;
-        $MPDF->simpleTables = true;
-        $MPDF->SetAutoPageBreak(false);
-        $MPDF->writeHTML($content);
+        @ini_set('pcre.backtrack_limit', max(1000000, round(strlen($content) * 2)));
 
-        return $MPDF->Output('', 'S');
+        if (isset($this->config['prepend'])) {
+            foreach ($this->config['prepend'] as $file => $pages) {
+                $this->_importPage($file, $pages);
+                $margin = Hash::merge(
+                    [
+                        'left' => 0,
+                        'right' => 0,
+                        'top' => 0,
+                        'bottom' => 0,
+                        'header' => 0,
+                        'footer' => 0,
+                    ],
+                    (array)$this->config['margin'],
+                    $this->_Pdf->margin()
+                );
+                $this->mpdf->AddPageByArray(
+                    [
+                        'orientation' => '',
+                        'condition' => 'NEXT-ODD',
+                        'ohname' => 'html_header',
+                        'ehname' => 'html_header',
+                        'ofname' => 'html_footer',
+                        'efname' => 'html_footer',
+                        'ohvalue' => 1,
+                        'ehvalue' => 1,
+                        'ofvalue' => 1,
+                        'efvalue' => 1,
+                        'mgl' => $margin['left'],
+                        'mgr' => $margin['right'],
+                        'mgt' => $margin['top'],
+                        'mgb' => $margin['bottom'],
+                        'mgh' => $margin['header'],
+                        'mgf' => $margin['footer'],
+                    ]
+                );
+            }
+        }
+
+        $this->mpdf->writeHTML($content);
+
+        if (isset($this->config['append'])) {
+            foreach ($this->config['append'] as $file => $pages) {
+                $this->_importPage($file, $pages, true);
+            }
+        }
+
+        $download = !! $this->config['download'];
+
+        if ('latest' === $this->_version
+            || version_compare($this->_version, '7', '>=')
+        ) {
+            $dest = $download ? \Mpdf\Output\Destination::DOWNLOAD : \Mpdf\Output\Destination::INLINE;
+        } else {
+            $dest = $download ? "D" : "S";
+        }
+
+        return $this->mpdf->Output('', $dest);
     }
 }
 
