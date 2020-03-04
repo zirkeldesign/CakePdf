@@ -522,8 +522,8 @@ class MpdfEngine extends AbstractPdfEngine
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
         // Configure::write('debug', 0);
 
-        set_time_limit(1000);
-        ini_set('memory_limit', '2048M');
+        set_time_limit(300);
+        // ini_set('memory_limit', '2048M');
 
         $content = $this->_Pdf->html();
 
