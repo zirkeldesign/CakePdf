@@ -253,7 +253,7 @@ class MpdfEngine extends AbstractPdfEngine
                             $e->getCode(),
                             $e->getMessage()
                         ),
-                        E_USER_ERROR
+                        E_USER_NOTICE
                     );
                 }
                 $mime = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
