@@ -446,10 +446,10 @@ class MpdfEngine extends AbstractPdfEngine
     protected function replaceAssetUrls($content)
     {
         // Rewrite internal ip asset urls
-        $internal_ip = env('SERVER_ADDR');
-        if ($internal_ip/* && in_array($internal_ip, ['10.251.3.68','37.61.205.200','37.61.205.123','37.61.206.113'])*/) {
+        $internal_ips = [env('SERVER_ADDR'), '10.8.13.6'];
+        if ($internal_ips/* && in_array($internal_ip, ['10.251.3.68','37.61.205.200','37.61.205.123','37.61.206.113'])*/) {
             // $content = str_replace(Router::url('/', true), 'https://www.ibb.com/', $content);
-            $content = str_replace($internal_ip, $this->_host, $content);
+            $content = str_replace($internal_ips, $this->_host, $content);
             $content = str_replace(WWW_ROOT, FULL_BASE_URL . '/', $content);
             $content = str_replace($this->_host . '/css', $this->_host . '/theme/Ibb/css', $content);
         }
