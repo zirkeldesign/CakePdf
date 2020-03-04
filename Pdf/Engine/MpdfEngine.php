@@ -543,65 +543,71 @@ class MpdfEngine extends AbstractPdfEngine
         // https://github.com/osTicket/osTicket/issues/1395#issuecomment-266522612
         $content = mb_convert_encoding($content, 'UTF-8', 'UTF-8');
 
-        @ini_set('pcre.backtrack_limit', max(1000000, round(strlen($content) * 2)));
+        try {
+            @ini_set('pcre.backtrack_limit', max(1000000, round(strlen($content) * 2)));
 
-        if (isset($this->config['prepend'])) {
-            foreach ($this->config['prepend'] as $file => $pages) {
-                $this->_importPage($file, $pages);
-                $margin = Hash::merge(
-                    [
-                        'left' => 0,
-                        'right' => 0,
-                        'top' => 0,
-                        'bottom' => 0,
-                        'header' => 0,
-                        'footer' => 0,
-                    ],
-                    (array)$this->config['margin'],
-                    $this->_Pdf->margin()
-                );
-                $this->mpdf->AddPageByArray(
-                    [
-                        'orientation' => '',
-                        'condition' => 'NEXT-ODD',
-                        'ohname' => 'html_header',
-                        'ehname' => 'html_header',
-                        'ofname' => 'html_footer',
-                        'efname' => 'html_footer',
-                        'ohvalue' => 1,
-                        'ehvalue' => 1,
-                        'ofvalue' => 1,
-                        'efvalue' => 1,
-                        'mgl' => $margin['left'],
-                        'mgr' => $margin['right'],
-                        'mgt' => $margin['top'],
-                        'mgb' => $margin['bottom'],
-                        'mgh' => $margin['header'],
-                        'mgf' => $margin['footer'],
-                    ]
-                );
+            if (isset($this->config['prepend'])) {
+                foreach ($this->config['prepend'] as $file => $pages) {
+                    $this->_importPage($file, $pages);
+                    $margin = Hash::merge(
+                        [
+                            'left' => 0,
+                            'right' => 0,
+                            'top' => 0,
+                            'bottom' => 0,
+                            'header' => 0,
+                            'footer' => 0,
+                        ],
+                        (array)$this->config['margin'],
+                        $this->_Pdf->margin()
+                    );
+                    $this->mpdf->AddPageByArray(
+                        [
+                            'orientation' => '',
+                            'condition' => 'NEXT-ODD',
+                            'ohname' => 'html_header',
+                            'ehname' => 'html_header',
+                            'ofname' => 'html_footer',
+                            'efname' => 'html_footer',
+                            'ohvalue' => 1,
+                            'ehvalue' => 1,
+                            'ofvalue' => 1,
+                            'efvalue' => 1,
+                            'mgl' => $margin['left'],
+                            'mgr' => $margin['right'],
+                            'mgt' => $margin['top'],
+                            'mgb' => $margin['bottom'],
+                            'mgh' => $margin['header'],
+                            'mgf' => $margin['footer'],
+                        ]
+                    );
+                }
             }
-        }
 
-        $this->mpdf->writeHTML($content);
+            $this->mpdf->writeHTML($content);
 
-        if (isset($this->config['append'])) {
-            foreach ($this->config['append'] as $file => $pages) {
-                $this->_importPage($file, $pages, true);
+            if (isset($this->config['append'])) {
+                foreach ($this->config['append'] as $file => $pages) {
+                    $this->_importPage($file, $pages, true);
+                }
             }
+
+            $download = !! $this->config['download'];
+
+            if ('latest' === $this->_version
+                || version_compare($this->_version, '7', '>=')
+            ) {
+                $dest = $download ? \Mpdf\Output\Destination::DOWNLOAD : \Mpdf\Output\Destination::INLINE;
+            } else {
+                $dest = $download ? "D" : "S";
+            }
+
+            $filename = isset($this->config['filename']) ? $this->config['filename'] : '';
+
+            return $this->mpdf->Output($filename, $dest);
+        } catch (\Mpdf\MpdfException $e) {
+            echo $e->getMessage();
         }
-
-        $download = !! $this->config['download'];
-
-        if ('latest' === $this->_version
-            || version_compare($this->_version, '7', '>=')
-        ) {
-            $dest = $download ? \Mpdf\Output\Destination::DOWNLOAD : \Mpdf\Output\Destination::INLINE;
-        } else {
-            $dest = $download ? "D" : "S";
-        }
-
-        return $this->mpdf->Output('', $dest);
     }
 }
 
