@@ -376,10 +376,10 @@ class MpdfEngine extends AbstractPdfEngine
      */
     protected function inlineImages($content)
     {
-        $regexp_images = '/<(?:img|image)[^>]*(?:src|xlink:href)=["\']([^>"\']*)["\'].*?>/si';
+        $regexp_images = '/<(?:img|image)[^>]*(?:src|xlink:href)=(["\'])([^>"\']*)\1.*?>/si';
         preg_match_all($regexp_images, $content, $m, PREG_SET_ORDER);
 
-        $regexp_inline = '/\:url\(["\']?([^>"\']*)["\']?\)/si';
+        $regexp_inline = '/\:url\((["\'])?([^>"\']*)\1?\)/siU';
         preg_match_all($regexp_inline, $content, $n, PREG_SET_ORDER);
 
         if (!count($m)
@@ -388,11 +388,11 @@ class MpdfEngine extends AbstractPdfEngine
             return $content;
         }
 
-        $matches = array_merge((array) $m, (array) $n);
+        $matches = array_merge((array)$m, (array)$n);
         $replaces = [];
         for ($i = 0, $l = count($matches); $i < $l; $i++) {
             $asset = $matches[$i];
-            $uri = $asset[1];
+            $uri = $asset[2];
             if (false === strpos($uri, $this->_host)
                 && false === strpos($uri, env('SERVER_ADDR'))
             ) {
