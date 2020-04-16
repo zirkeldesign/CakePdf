@@ -613,7 +613,7 @@ class MpdfEngine extends AbstractPdfEngine
                 }
 
                 $this->_importPage($tempFile);
-                // unlink($tempFile);
+                unlink($tempFile);
 
                 if (isset($this->config['append'])) {
                     foreach ($this->config['append'] as $file => $pages) {
