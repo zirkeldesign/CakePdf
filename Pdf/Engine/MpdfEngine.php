@@ -465,11 +465,11 @@ class MpdfEngine extends AbstractPdfEngine
      * Import pages from external file
      *
      * @param  [type]  $file
-     * @param  array   $pages
+     * @param  null|array   $pages
      * @param  boolean $reset
      * @return void
      */
-    private function _importPage($file, $pages = [], $reset = false)
+    private function _importPage($file, $pages = null, $reset = false)
     {
         list($plugin, $path) = pluginSplit($file);
 
@@ -479,35 +479,83 @@ class MpdfEngine extends AbstractPdfEngine
             $file = DS . ltrim(CakePlugin::path($plugin), DS) . 'webroot' . $path;
         }
 
+        $pageNumbers = null;
+
         $filePages = $this->mpdf->setSourceFile($file);
         if ($filePages) {
-            $pages = (array)$pages;
-            $pageNumbers = Hash::numeric(array_values($pages)) ? array_values($pages) : array_keys($pages);
+            if (is_null($pages)) {
+                $pages = 'all';
+            } else {
+                $pages = (array)$pages;
+                $pageNumbers = Hash::numeric(array_values($pages)) ? array_values($pages) : array_keys($pages);
+            }
+
+            $margin = Hash::merge(
+                [
+                    'left' => 0,
+                    'right' => 0,
+                    'top' => 0,
+                    'bottom' => 0,
+                    'header' => 0,
+                    'footer' => 0,
+                ],
+                (array)$this->config['margin'],
+                $this->_Pdf->margin()
+            );
 
             for ($i = 1; $i <= $filePages; $i++) {
-                if (in_array($i, (array)$pageNumbers)) {
-                    if ($reset) {
-                        $this->mpdf->AddPageByArray(
-                            [
+                if (is_array($pageNumbers)
+                    && !in_array($i, (array)$pageNumbers)
+                ) {
+                    continue;
+                }
+
+                if ($reset) {
+                    $this->mpdf->AddPageByArray(
+                        [
                             'condition' => 'NEXT-ODD',
                             'ohvalue' => -1,
                             'ehvalue' => -1,
                             'ofvalue' => -1,
                             'efvalue' => -1,
-                            ]
-                        );
-                    } else {
-                        $this->mpdf->AddPage();
-                    }
-                    $tplId = $this->mpdf->importPage($i);
-                    $this->mpdf->useTemplate($tplId);
-                    if (isset($pages[$i])) {
-                        $this->mpdf->WriteHTML($pages[$i]);
-                    } else {
-                        $this->mpdf->WriteHTML('');
-                    }
+                        ]
+                    );
+                } else {
+                    $this->mpdf->AddPageByArray(
+                        [
+                            'orientation' => '',
+                            'condition' => 'NEXT-ODD',
+                            'ohname' => 'html_header',
+                            'ehname' => 'html_header',
+                            'ofname' => 'html_footer',
+                            'efname' => 'html_footer',
+                            'ohvalue' => 1,
+                            'ehvalue' => 1,
+                            'ofvalue' => 1,
+                            'efvalue' => 1,
+                            'mgl' => $margin['left'],
+                            'mgr' => $margin['right'],
+                            'mgt' => $margin['top'],
+                            'mgb' => $margin['bottom'],
+                            'mgh' => $margin['header'],
+                            'mgf' => $margin['footer'],
+                        ]
+                    );
+                }
+
+                $tplId = $this->mpdf->importPage($i);
+                $this->mpdf->useTemplate($tplId);
+
+                if (is_array($pages)
+                    && isset($pages[$i])
+                ) {
+                    $this->mpdf->WriteHTML($pages[$i]);
+                } else {
+                    $this->mpdf->WriteHTML('');
                 }
             }
+
+            $this->mpdf->SetPageTemplate();
         }
     }
 
@@ -522,7 +570,7 @@ class MpdfEngine extends AbstractPdfEngine
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
         // Configure::write('debug', 0);
 
-        set_time_limit(300);
+        set_time_limit(600);
         // ini_set('memory_limit', '2048M');
 
         $content = $this->_Pdf->html();
@@ -546,49 +594,31 @@ class MpdfEngine extends AbstractPdfEngine
         try {
             @ini_set('pcre.backtrack_limit', max(1000000, round(strlen($content) * 2)));
 
-            if (isset($this->config['prepend'])) {
-                foreach ($this->config['prepend'] as $file => $pages) {
-                    $this->_importPage($file, $pages);
-                    $margin = Hash::merge(
-                        [
-                            'left' => 0,
-                            'right' => 0,
-                            'top' => 0,
-                            'bottom' => 0,
-                            'header' => 0,
-                            'footer' => 0,
-                        ],
-                        (array)$this->config['margin'],
-                        $this->_Pdf->margin()
-                    );
-                    $this->mpdf->AddPageByArray(
-                        [
-                            'orientation' => '',
-                            'condition' => 'NEXT-ODD',
-                            'ohname' => 'html_header',
-                            'ehname' => 'html_header',
-                            'ofname' => 'html_footer',
-                            'efname' => 'html_footer',
-                            'ohvalue' => 1,
-                            'ehvalue' => 1,
-                            'ofvalue' => 1,
-                            'efvalue' => 1,
-                            'mgl' => $margin['left'],
-                            'mgr' => $margin['right'],
-                            'mgt' => $margin['top'],
-                            'mgb' => $margin['bottom'],
-                            'mgh' => $margin['header'],
-                            'mgf' => $margin['footer'],
-                        ]
-                    );
-                }
-            }
-
             $this->mpdf->writeHTML($content);
 
-            if (isset($this->config['append'])) {
-                foreach ($this->config['append'] as $file => $pages) {
-                    $this->_importPage($file, $pages, true);
+            if (isset($this->config['prepend'])
+                || isset($this->config['append'])
+            ) {
+                $tempFile = tempnam(TMP, 'cache_tmp_');
+
+                $this->mpdf->Output($tempFile, \Mpdf\Output\Destination::FILE);
+
+                $content = null;
+                $this->_initMPDF();
+            
+                if (isset($this->config['prepend'])) {
+                    foreach ($this->config['prepend'] as $file => $pages) {
+                        $this->_importPage($file, $pages);
+                    }
+                }
+
+                $this->_importPage($tempFile);
+                // unlink($tempFile);
+
+                if (isset($this->config['append'])) {
+                    foreach ($this->config['append'] as $file => $pages) {
+                        $this->_importPage($file, $pages, true);
+                    }
                 }
             }
 
