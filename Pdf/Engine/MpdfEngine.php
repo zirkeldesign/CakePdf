@@ -560,6 +560,16 @@ class MpdfEngine extends AbstractPdfEngine
     }
 
     /**
+     * Get temporary file name
+     *
+     * @return string
+     */
+    public function getTempFile()
+    {
+        return tempnam(TMP . DS . 'cache' . DS . 'pdf', 'cache_tmp_');
+    }
+
+    /**
      * Generates Pdf from html
      *
      * @method output
@@ -599,7 +609,7 @@ class MpdfEngine extends AbstractPdfEngine
             if (isset($this->config['prepend'])
                 || isset($this->config['append'])
             ) {
-                $tempFile = tempnam(TMP, 'cache_tmp_');
+                $tempFile = $this->getTempFile();
 
                 $this->mpdf->Output($tempFile, \Mpdf\Output\Destination::FILE);
 
