@@ -32,6 +32,13 @@ class MpdfEngine extends AbstractPdfEngine
     private $_verifySsl = true;
 
     /**
+     * Temporary file
+     *
+     * @var string|null
+     */
+    private $_tmpFile;
+
+    /**
      * Use library version.
      *
      * @var string
@@ -44,6 +51,13 @@ class MpdfEngine extends AbstractPdfEngine
      * @var [type]
      */
     public $mpdf = null;
+
+    /**
+     * Contains DeepCopy class.
+     *
+     * @var [type]
+     */
+    private $_copier;
 
     /**
      * Config
@@ -159,6 +173,7 @@ class MpdfEngine extends AbstractPdfEngine
                 );
 
                 $this->mpdf = new \Mpdf\Mpdf($this->config);
+                $this->_copier = new \DeepCopy\DeepCopy(true);
             } catch (\Mpdf\MpdfException $e) {
                 // Note: safer fully qualified exception name used for catch
                 // Process the exception, log, print etc.
@@ -560,22 +575,71 @@ class MpdfEngine extends AbstractPdfEngine
     }
 
     /**
+     * Get cache key for page info
+     *
+     * @return string
+     */
+    private function _getPagesCacheKey()
+    {
+        return 'pdf_pages_' . (isset($this->config['filename']) ? $this->config['filename'] : '');
+    }
+
+    /**
+     * Get amount of pages
+     *
+     * @param string $content
+     * @return void
+     */
+    public function getPages($content = null)
+    {
+        $cache = Cache::read($this->_getPagesCacheKey(), 'courses');
+        if ($cache) {
+            return $cache;
+        }
+
+        if (!$this->_copier) {
+            return;
+        }
+
+        $tmp = $this->_copier->copy($this->mpdf);
+        if (is_string($content)
+            && strlen($content)
+        ) {
+            $tmp->writeHTML($content);
+        }
+        $tmp->Close();
+
+        $pages = preg_match_all("/\/Page\W/", $tmp->buffer);
+        error_log(print_r($pages, true), 3, TMP . DS . 'logs' . DS . 'pdf.log');
+
+        unset($tmp);
+
+        return $pages;
+    }
+
+    /**
      * Get temporary file name
      *
      * @return string
      */
-    public function getTempFile()
+    public function getTempFile($generate = true)
     {
-        return tempnam(TMP . DS . 'cache' . DS . 'pdf', 'cache_tmp_');
+        if ($generate) {
+            $this->_tmpFile = tempnam(TMP . DS . 'cache' . DS . 'mpdf', 'cache_tmp_');
+        }
+
+        return $this->_tmpFile;
     }
 
     /**
      * Generates Pdf from html
      *
-     * @method output
-     * @return string raw pdf data
+     * @param [type] $content
+     * @param [type] $return
+     *
+     * @return string Raw Pdf data
      */
-    public function output()
+    public function output($content = null, $return = null)
     {
         // mPDF often produces a whole bunch of errors, although there is a pdf created when debug = 0
         // Configure::write('debug', 0);
@@ -583,7 +647,9 @@ class MpdfEngine extends AbstractPdfEngine
         set_time_limit(600);
         // ini_set('memory_limit', '2048M');
 
-        $content = $this->_Pdf->html();
+        if (is_null($content)) {
+            $content = $this->_Pdf->html();
+        }
 
         Configure::write('Site.forcehttps', true);
 
@@ -643,6 +709,16 @@ class MpdfEngine extends AbstractPdfEngine
             }
 
             $filename = isset($this->config['filename']) ? $this->config['filename'] : '';
+
+            if ($return) {
+                $dest = in_array($return, [\Mpdf\Output\Destination::FILE, "F", \Mpdf\Output\Destination::STRING_RETURN, "S"]) ? $return : \Mpdf\Output\Destination::STRING_RETURN;
+                $filename = in_array($dest, [\Mpdf\Output\Destination::FILE, "F"]) ? $this->getTempFile() : null;
+            }
+
+            $pages = $this->getPages();
+            if ($pages) {
+                Cache::write($this->_getPagesCacheKey(), $pages, 'courses');
+            }
 
             return $this->mpdf->Output($filename, $dest);
         } catch (\Mpdf\MpdfException $e) {
