@@ -588,9 +588,11 @@ class MpdfEngine extends AbstractPdfEngine
      * Get amount of pages
      *
      * @param string $content
-     * @return void
+     * @param bool $setCache
+     *
+     * @return int
      */
-    public function getPages($content = null)
+    public function getPages($content = null, $setCache = false)
     {
         $cache = Cache::read($this->_getPagesCacheKey(), 'courses');
         if ($cache) {
@@ -601,16 +603,20 @@ class MpdfEngine extends AbstractPdfEngine
             return;
         }
 
+        $setContent = is_string($content) && strlen($content);
+
         $tmp = $this->_copier->copy($this->mpdf);
-        if (is_string($content)
-            && strlen($content)
-        ) {
+        if ($setContent) {
             $tmp->writeHTML($content);
         }
         $tmp->Close();
 
         $pages = preg_match_all("/\/Page\W/", $tmp->buffer);
-        error_log(print_r($pages, true), 3, TMP . DS . 'logs' . DS . 'pdf.log');
+
+        if ($setCache) {
+            // error_log(print_r(compact('pages', 'content'), true) . chr(10) . chr(10), 3, TMP . DS . 'logs' . DS . 'pdf.log');
+            Cache::write($this->_getPagesCacheKey(), $pages, 'courses');
+        }
 
         unset($tmp);
 
@@ -715,10 +721,7 @@ class MpdfEngine extends AbstractPdfEngine
                 $filename = in_array($dest, [\Mpdf\Output\Destination::FILE, "F"]) ? $this->getTempFile() : null;
             }
 
-            $pages = $this->getPages();
-            if ($pages) {
-                Cache::write($this->_getPagesCacheKey(), $pages, 'courses');
-            }
+            $pages = $this->getPages(null, true);
 
             return $this->mpdf->Output($filename, $dest);
         } catch (\Mpdf\MpdfException $e) {
