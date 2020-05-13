@@ -611,12 +611,10 @@ class MpdfEngine extends AbstractPdfEngine
         }
         $tmp->Close();
 
-        $buffer = $tmp->buffer;
-
-        $pages = preg_match_all("/\/Page\W/", $buffer);
+        $pages = preg_match_all("/\/Page\W/", $tmp->buffer);
 
         if ($setCache) {
-            error_log(print_r(compact('pages', 'content', 'buffer'), true) . chr(10) . chr(10), 3, TMP . DS . 'logs' . DS . 'pdf.log');
+            // error_log(print_r(compact('pages', 'content', 'buffer'), true) . chr(10) . chr(10), 3, TMP . DS . 'logs' . DS . 'pdf.log');
             Cache::write($this->_getPagesCacheKey(), $pages, 'courses');
         }
 
