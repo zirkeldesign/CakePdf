@@ -315,9 +315,11 @@ class MpdfEngine extends AbstractPdfEngine
                 $mime = 'image/svg+xml;utf-8';
                 break;
             case false !== strpos($firstBytes, 'PNG'):
+            case (bin2hex($firstBytes[0]) === '89' && $firstBytes[1] === 'P' && $firstBytes[2] === 'N' && $firstBytes[3] === 'G'):
                 $mime = 'image/png';
                 break;
             case false !== strpos($firstBytes, 'JFIF'):
+            case bin2hex($firstBytes[0]) === 'ff' && bin2hex($firstBytes[1]) === 'd8':
                 $mime = 'image/jpg';
                 break;
             default:
@@ -431,7 +433,10 @@ class MpdfEngine extends AbstractPdfEngine
                     // $replaces['src="' . $uri . '"'] = 'src="var:' . $key . '"';
                     // $this->_images[$key] = $file_content;
                     // unset($file_content);
-                    $replaces[$asset[0]] = str_replace($uri, $this->_base64Encode($file_content), $asset[0]);
+                    $base64Encode = $this->_base64Encode($file_content);
+                    if ($base64Encode) {
+                        $replaces[$asset[0]] = str_replace($uri, $base64Encode, $asset[0]);
+                    }
                     break;
                 }
             } else {
